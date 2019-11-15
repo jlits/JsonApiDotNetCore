@@ -124,7 +124,7 @@ namespace JsonApiDotNetCore.Extensions
             services.AddScoped(typeof(IGetByIdService<>), typeof(EntityResourceService<>));
             services.AddScoped(typeof(IGetByIdService<,>), typeof(EntityResourceService<,>));
 
-            services.AddScoped(typeof(IGetRelationshipService<,>), typeof(EntityResourceService<>));
+            services.AddScoped(typeof(IGetRelationshipService<>), typeof(EntityResourceService<>));
             services.AddScoped(typeof(IGetRelationshipService<,>), typeof(EntityResourceService<,>));
 
             services.AddScoped(typeof(IUpdateService<>), typeof(EntityResourceService<>));
