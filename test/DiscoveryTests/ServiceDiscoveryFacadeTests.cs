@@ -1,89 +1,205 @@
-using System;
-using GettingStarted.Models;
-using GettingStarted.ResourceDefinitionExample;
-using JsonApiDotNetCore.Builders;
-using JsonApiDotNetCore.Data;
-using JsonApiDotNetCore.Graph;
-using JsonApiDotNetCore.Models;
+using System.Collections.Generic;
+using FluentAssertions;
+using JetBrains.Annotations;
+using JsonApiDotNetCore.Configuration;
+using JsonApiDotNetCore.Hooks;
+using JsonApiDotNetCore.Middleware;
+using JsonApiDotNetCore.Queries;
+using JsonApiDotNetCore.Repositories;
+using JsonApiDotNetCore.Resources;
 using JsonApiDotNetCore.Services;
+using JsonApiDotNetCoreExample.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
 namespace DiscoveryTests
 {
-    public class ServiceDiscoveryFacadeTests
+    public sealed class ServiceDiscoveryFacadeTests
     {
+        private static readonly NullLoggerFactory LoggerFactory = NullLoggerFactory.Instance;
         private readonly IServiceCollection _services = new ServiceCollection();
-        private readonly ResourceGraphBuilder _graphBuilder = new ResourceGraphBuilder();
-        private ServiceDiscoveryFacade _facade => new ServiceDiscoveryFacade(_services, _graphBuilder);
+        private readonly JsonApiOptions _options = new JsonApiOptions();
+        private readonly ResourceGraphBuilder _resourceGraphBuilder;
 
-        [Fact]
-        public void AddAssembly_Adds_All_Resources_To_Graph()
+        public ServiceDiscoveryFacadeTests()
         {
-            // arrange, act
-            _facade.AddAssembly(typeof(Person).Assembly);
+            var dbResolverMock = new Mock<IDbContextResolver>();
+            dbResolverMock.Setup(m => m.GetContext()).Returns(new Mock<DbContext>().Object);
+            _services.AddScoped(_ => dbResolverMock.Object);
 
-            // assert
-            var graph = _graphBuilder.Build();
-            var personResource = graph.GetContextEntity(typeof(Person));
-            var articleResource = graph.GetContextEntity(typeof(Article));
-            var modelResource = graph.GetContextEntity(typeof(Model));
+            _services.AddSingleton<IJsonApiOptions>(_options);
+            _services.AddSingleton<ILoggerFactory>(LoggerFactory);
+            _services.AddScoped(_ => new Mock<IJsonApiRequest>().Object);
+            _services.AddScoped(_ => new Mock<ITargetedFields>().Object);
+            _services.AddScoped(_ => new Mock<IResourceGraph>().Object);
+            _services.AddScoped(_ => new Mock<IGenericServiceFactory>().Object);
+            _services.AddScoped(_ => new Mock<IResourceContextProvider>().Object);
+            _services.AddScoped(typeof(IResourceChangeTracker<>), typeof(ResourceChangeTracker<>));
+            _services.AddScoped(_ => new Mock<IResourceFactory>().Object);
+            _services.AddScoped(_ => new Mock<IPaginationContext>().Object);
+            _services.AddScoped(_ => new Mock<IQueryLayerComposer>().Object);
+            _services.AddScoped(_ => new Mock<IResourceRepositoryAccessor>().Object);
+            _services.AddScoped(_ => new Mock<IResourceHookExecutorFacade>().Object);
 
-            Assert.NotNull(personResource);
-            Assert.NotNull(articleResource);
-            Assert.NotNull(modelResource);
+            _resourceGraphBuilder = new ResourceGraphBuilder(_options, LoggerFactory);
         }
 
         [Fact]
-        public void AddCurrentAssembly_Adds_Resources_To_Graph()
+        public void Can_add_resources_from_assembly_to_graph()
         {
-            // arrange, act
-            _facade.AddCurrentAssembly();
+            // Arrange
+            var facade = new ServiceDiscoveryFacade(_services, _resourceGraphBuilder, _options, LoggerFactory);
+            facade.AddAssembly(typeof(Person).Assembly);
 
-            // assert
-            var graph = _graphBuilder.Build();
-            var testModelResource = graph.GetContextEntity(typeof(TestModel));
-            Assert.NotNull(testModelResource);
+            // Act
+            facade.DiscoverResources();
+            
+            // Assert
+            var resourceGraph = _resourceGraphBuilder.Build();
+            
+            var personResource = resourceGraph.GetResourceContext(typeof(Person));
+            personResource.Should().NotBeNull();
+
+            var articleResource = resourceGraph.GetResourceContext(typeof(Article));
+            articleResource.Should().NotBeNull();
         }
 
         [Fact]
-        public void AddCurrentAssembly_Adds_Services_To_Container()
+        public void Can_add_resource_from_current_assembly_to_graph()
         {
-            // arrange, act
-            _facade.AddCurrentAssembly();
+            // Arrange
+            var facade = new ServiceDiscoveryFacade(_services, _resourceGraphBuilder, _options, LoggerFactory);
+            facade.AddCurrentAssembly();
 
-            // assert
+            // Act
+            facade.DiscoverResources();
+            
+            // Assert
+            var resourceGraph = _resourceGraphBuilder.Build();
+
+            var resource = resourceGraph.GetResourceContext(typeof(TestResource));
+            resource.Should().NotBeNull();
+        }
+
+        [Fact]
+        public void Can_add_resource_service_from_current_assembly_to_container()
+        {
+            // Arrange
+            var facade = new ServiceDiscoveryFacade(_services, _resourceGraphBuilder, _options, LoggerFactory);
+            facade.AddCurrentAssembly();
+            
+            // Act
+            facade.DiscoverInjectables();
+
+            // Assert
             var services = _services.BuildServiceProvider();
-            Assert.IsType<TestModelService>(services.GetService<IResourceService<TestModel>>());
+
+            var resourceService = services.GetRequiredService<IResourceService<TestResource>>();
+            resourceService.Should().BeOfType<TestResourceService>();
         }
 
         [Fact]
-        public void AddCurrentAssembly_Adds_Repositories_To_Container()
+        public void Can_add_resource_repository_from_current_assembly_to_container()
         {
-            // arrange, act
-            _facade.AddCurrentAssembly();
+            // Arrange
+            var facade = new ServiceDiscoveryFacade(_services, _resourceGraphBuilder, _options, LoggerFactory);
+            facade.AddCurrentAssembly();
 
-            // assert
+            // Act
+            facade.DiscoverInjectables();
+
+            // Assert
             var services = _services.BuildServiceProvider();
-            Assert.IsType<TestModelRepository>(services.GetService<IEntityRepository<TestModel>>());
+
+            var resourceRepository = services.GetRequiredService<IResourceRepository<TestResource>>();
+            resourceRepository.Should().BeOfType<TestResourceRepository>();
         }
 
-        public class TestModel : Identifiable { }
-
-        public class TestModelService : EntityResourceService<TestModel>
+        [Fact]
+        public void Can_add_resource_definition_from_current_assembly_to_container()
         {
-            private static IEntityRepository<TestModel> _repo = new Mock<IEntityRepository<TestModel>>().Object;
-            private static IJsonApiContext _jsonApiContext = new  Mock<IJsonApiContext>().Object;
-            public TestModelService() : base(_jsonApiContext, _repo) { }
+            // Arrange
+            var facade = new ServiceDiscoveryFacade(_services, _resourceGraphBuilder, _options, LoggerFactory);
+            facade.AddCurrentAssembly();
+
+            // Act
+            facade.DiscoverInjectables();
+
+            // Assert
+            var services = _services.BuildServiceProvider();
+
+            var resourceDefinition = services.GetRequiredService<IResourceDefinition<TestResource>>();
+            resourceDefinition.Should().BeOfType<TestResourceDefinition>();
         }
 
-        public class TestModelRepository : DefaultEntityRepository<TestModel>
+        [Fact]
+        public void Can_add_resource_hooks_definition_from_current_assembly_to_container()
         {
-            private static IDbContextResolver _dbContextResolver = new  Mock<IDbContextResolver>().Object;
-            private static IJsonApiContext _jsonApiContext = new  Mock<IJsonApiContext>().Object;
-            public TestModelRepository() : base(_jsonApiContext, _dbContextResolver) { }
+            // Arrange
+            var facade = new ServiceDiscoveryFacade(_services, _resourceGraphBuilder, _options, LoggerFactory);
+            facade.AddCurrentAssembly();
+
+            _options.EnableResourceHooks = true;
+
+            // Act
+            facade.DiscoverInjectables();
+
+            // Assert
+            var services = _services.BuildServiceProvider();
+
+            var resourceHooksDefinition = services.GetRequiredService<ResourceHooksDefinition<TestResource>>();
+            resourceHooksDefinition.Should().BeOfType<TestResourceHooksDefinition>();
+        }
+
+        [UsedImplicitly(ImplicitUseTargetFlags.Members)]
+        public sealed class TestResource : Identifiable { }
+
+        [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
+        public sealed class TestResourceService : JsonApiResourceService<TestResource>
+        {
+            public TestResourceService(
+                IResourceRepositoryAccessor repositoryAccessor,
+                IQueryLayerComposer queryLayerComposer,
+                IPaginationContext paginationContext,
+                IJsonApiOptions options,
+                ILoggerFactory loggerFactory,
+                IJsonApiRequest request,
+                IResourceChangeTracker<TestResource> resourceChangeTracker,
+                IResourceHookExecutorFacade hookExecutor)
+                : base(repositoryAccessor, queryLayerComposer, paginationContext, options, loggerFactory, request,
+                    resourceChangeTracker, hookExecutor)
+            {
+            }
+        }
+
+        [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
+        public sealed class TestResourceRepository : EntityFrameworkCoreRepository<TestResource>
+        {
+            public TestResourceRepository(
+                ITargetedFields targetedFields,
+                IDbContextResolver contextResolver,
+                IResourceGraph resourceGraph,
+                IResourceFactory resourceFactory,
+                IEnumerable<IQueryConstraintProvider> constraintProviders,
+                ILoggerFactory loggerFactory)
+                : base(targetedFields, contextResolver, resourceGraph, resourceFactory, constraintProviders, loggerFactory)
+            { }
+        }
+
+        [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
+        public sealed class TestResourceHooksDefinition : ResourceHooksDefinition<TestResource>
+        {
+            public TestResourceHooksDefinition(IResourceGraph resourceGraph) : base(resourceGraph) { }
+        }
+
+        [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
+        public sealed class TestResourceDefinition : JsonApiResourceDefinition<TestResource>
+        {
+            public TestResourceDefinition(IResourceGraph resourceGraph) : base(resourceGraph) { }
         }
     }
 }

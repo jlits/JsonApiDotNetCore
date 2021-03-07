@@ -1,99 +1,95 @@
-# Entity Repositories
+# Resource Repositories
 
-If you want to use EF, but need additional data access logic (such as authorization), you can implement custom methods for accessing the data by creating an implementation of IEntityRepository<Entity, TId>. If you only need minor changes you can override the methods defined in DefaultEntityRepository<TEntity, TId>.
+If you want to use a data access technology other than Entity Framework Core, you can create an implementation of `IResourceRepository<TResource, TId>`.
+If you only need minor changes you can override the methods defined in `EntityFrameworkCoreRepository<TResource, TId>`.
 
-The repository should then be add to the service collection in Startup.cs.
+The repository should then be registered in Startup.cs.
 
 ```c#
-public IServiceProvider ConfigureServices(IServiceCollection services) 
+public void ConfigureServices(IServiceCollection services)
 {
-    services.AddScoped<IEntityRepository<Article>, AuthorizedArticleRepository>();
-    // ...
+    services.AddScoped<IResourceRepository<Article>, ArticleRepository>();
 }
 ```
 
-A sample implementation that performs data authorization might look like this.
+In v4.0 we introduced an extension method that you can use to register a resource repository on all of its JsonApiDotNetCore interfaces.
+This is helpful when you implement a subset of the resource interfaces and want to register them all in one go.
 
-All of the methods in the DefaultEntityRepository will use the Get() method to get the DbSet<TEntity> so this is a good method to apply scoped filters such as user or tenant authorization.
+Note: If you're using service discovery, this happens automatically.
 
 ```c#
-public class AuthorizedArticleRepository 
-  : DefaultEntityRepository<Article>
+public class Startup
+{
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddResourceRepository<ArticleRepository>();
+    }
+}
+```
+
+A sample implementation that performs authorization might look like this.
+
+All of the methods in EntityFrameworkCoreRepository will use the `GetAll()` method to get the `DbSet<TResource>`, so this is a good method to apply filters such as user or tenant authorization.
+
+```c#
+public class ArticleRepository : EntityFrameworkCoreRepository<Article>
 {
     private readonly IAuthenticationService _authenticationService;
 
-    public AuthorizedArticleRepository(
-        ILoggerFactory loggerFactory,
-        IJsonApiContext jsonApiContext,
+    public ArticleRepository(
+        IAuthenticationService authenticationService,
+        ITargetedFields targetedFields,
         IDbContextResolver contextResolver,
-        IAuthenticationService authenticationService)
-    : base(loggerFactory, jsonApiContext, contextResolver)
+        IResourceGraph resourceGraph,
+        IGenericServiceFactory genericServiceFactory,
+        IResourceFactory resourceFactory,
+        IEnumerable<IQueryConstraintProvider> constraintProviders,
+        ILoggerFactory loggerFactory)
+        : base(targetedFields, contextResolver, resourceGraph, genericServiceFactory,
+            resourceFactory, constraintProviders, loggerFactory) 
     {
         _authenticationService = authenticationService;
     }
 
-    public override IQueryable<MyEntity> Get() 
-        => base.Get()
-            .Where(e => 
-                e.UserId == _authenticationService.UserId
-            );
+    public override IQueryable<Article> GetAll(CancellationToken cancellationToken)
+    {
+        return base.GetAll(cancellationToken)
+            .Where(article => article.UserId == _authenticationService.UserId);
+    }
 }
 ```
 
 ## Multiple DbContexts
 
-If you need to use multiple EF DbContext, first add each DbContext to the ContextGraphBuilder.
-
-Then, create an implementation of IDbContextResolver for each context.
-
-Register each of the new IDbContextResolver implementations in the Startup.
-
-You can then create a general repository for each context and inject it per resource type. This example shows a single DbContextARepository for all entities that are members of DbContextA.
-
-Then inject the repository for the correct entity, in this case Foo is a member of DbContextA.
+If you need to use multiple Entity Framework Core DbContexts, first create a repository for each context and inject its typed resolver.
+This example shows a single `DbContextARepository` for all entities that are members of `DbContextA`.
 
 ```c#
-// Startup.cs
-services.AddJsonApi(options => {
-  options.BuildContextGraph((builder) =>
-  {
-      // Add both contexts using the builder
-      builder.AddDbContext<DbContextA>();
-      builder.AddDbContext<DbContextB>();
-  });
-}, mvcBuilder);
-
-
-public class DbContextAResolver : IDbContextResolver
+public class DbContextARepository<TResource> : EntityFrameworkCoreRepository<TResource>
+    where TResource : class, IIdentifiable<int>
 {
-    private readonly DbContextA _context;
-
-    public DbContextAResolver(DbContextA context)
+    public DbContextARepository(ITargetedFields targetedFields, DbContextResolver<DbContextA> contextResolver,
+        //                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        IResourceGraph resourceGraph, IGenericServiceFactory genericServiceFactory,
+        IResourceFactory resourceFactory, IEnumerable<IQueryConstraintProvider> constraintProviders,
+        ILoggerFactory loggerFactory)
+        : base(targetedFields, contextResolver, resourceGraph, genericServiceFactory, resourceFactory,
+            constraintProviders, loggerFactory)
     {
-        _context = context;
     }
-
-    public DbContext GetContext() => _context;
 }
+```
 
+Then register the added types and use the non-generic overload of `AddJsonApi` to add their resources to the graph.
 
-// Startup.cs
-services.AddScoped<DbContextAResolver>();
-services.AddScoped<DbContextBResolver>();
+```c#
+// In Startup.ConfigureServices
 
+services.AddDbContext<DbContextA>(options => options.UseSqlite("Data Source=A.db"));
+services.AddDbContext<DbContextB>(options => options.UseSqlite("Data Source=B.db"));
 
-public class DbContextARepository<TEntity> 
-: DefaultEntityRepository<TEntity> where TEntity : class, IIdentifiable<T>
-{
-  public DbContextARepository(
-      ILoggerFactory loggerFactory,
-      IJsonApiContext jsonApiContext,
-      DbContextAResolver contextResolver)
-  : base(loggerFactory, jsonApiContext, contextResolver)
-  { }
-}
+services.AddScoped<IResourceRepository<ResourceA>, DbContextARepository<ResourceA>>();
+services.AddScoped<IResourceRepository<ResourceB>, DbContextBRepository<ResourceB>>();
 
-
-// Startup.cs
-services.AddScoped<IEntityRepository<Foo>, DbContextARepository<Foo>>();
+services.AddJsonApi(dbContextTypes: new[] {typeof(DbContextA), typeof(DbContextB)});
 ```

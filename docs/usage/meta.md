@@ -1,52 +1,81 @@
 # Metadata
 
-Non-standard metadata can be added to your API responses in 2 ways. Resource and Request meta. In the event of a key collision, the Request Meta will take precendence.
+We support two ways to add JSON:API meta to your responses: global and per resource.
 
-## Resource Meta
+## Global Meta
 
-Resource Meta is metadata defined on the resource itself by implementing the `IHasMeta` interface.
+Global metadata can be added to the root of the response document by registering a service that implements `IResponseMeta`.
+This is useful if you need access to other registered services to build the meta object.
 
 ```c#
-public class Person : Identifiable, IHasMeta
+// In Startup.ConfigureServices
+services.AddSingleton<IResponseMeta, CopyrightResponseMeta>();
+
+public sealed class CopyrightResponseMeta : IResponseMeta
 {
-    public Dictionary<string, object> GetMeta(IJsonApiContext context)
-        => new Dictionary<string, object> {
-            { "copyright", "Copyright 2018 Example Corp." },
-            { "authors", new string[] { "Jared Nance" } }
+    public IReadOnlyDictionary<string, object> GetMeta()
+    {
+        return new Dictionary<string, object>
+        {
+            ["copyright"] = "Copyright (C) 2002 Umbrella Corporation.",
+            ["authors"] = new[] {"Alice", "Red Queen"}
         };
-}
-```
-
-## Request Meta
-
-Request Meta can be added by injecting a service that implements `IRequestMeta`. 
-This is useful if you need access to other injected services to build the meta object.
-
-```c#
-public class RequestMetaService : IRequestMeta
-{
-    public RequestMetaService(/*...other dependencies here */) {
-        // ...
     }
-
-    public Dictionary<string, object> GetMeta(IJsonApiContext context)
-        => return new Dictionary<string, object> {
-                { "copyright", "Copyright 2018 Example Corp." },
-                { "authors", new string[] { "Jared Nance" } }
-            };
 }
 ```
 
 ```json
 {
   "meta": {
-    "copyright": "Copyright 2015 Example Corp.",
+    "copyright": "Copyright (C) 2002 Umbrella Corporation.",
     "authors": [
-      "Jared Nance"
+      "Alice",
+      "Red Queen"
     ]
   },
-  "data": {
-    // ...
-  }
+  "data": []
+}
+```
+
+## Resource Meta
+
+Resource-specific metadata can be added by implementing `IResourceDefinition<TResource, TId>.GetMeta` (or overriding it on `JsonApiResourceDefinition`):
+
+```c#
+public class PersonDefinition : JsonApiResourceDefinition<Person>
+{
+    public PersonDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
+
+    public override IReadOnlyDictionary<string, object> GetMeta(Person person)
+    {
+        if (person.IsEmployee)
+        {
+            return new Dictionary<string, object>
+            {
+                ["notice"] = "Check our intranet at http://www.example.com/employees/" + person.StringId + " for personal details."
+            };
+        }
+
+        return null;
+    }
+}
+```
+
+```json
+{
+  "data": [
+    {
+      "type": "people",
+      "id": "1",
+      "attributes": {
+        ...
+      },
+      "meta": {
+        "notice": "Check our intranet at http://www.example.com/employees/1 for personal details."
+      }
+    }
+  ]
 }
 ```

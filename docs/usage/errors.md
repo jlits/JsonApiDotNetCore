@@ -1,67 +1,92 @@
 # Errors
 
-By default, errors will only contain the properties defined by the `Error` class. 
-However, you can create your own by inheriting from Error and either throwing it in a `JsonApiException` or returning the error from your controller.
+Errors returned will contain only the properties that are set on the `Error` class. Custom fields can be added through `Error.Meta`.
+You can create a custom error by throwing a `JsonApiException` (which accepts an `Error` instance), or returning an `Error` instance from an `ActionResult` in a controller.
+Please keep in mind that JSON:API requires Title to be a generic message, while Detail should contain information about the specific problem occurence.
+
+From a controller method:
+```c#
+return Conflict(new Error(HttpStatusCode.Conflict)
+{
+    Title = "Target resource was modified by another user.",
+    Detail = $"User {userName} changed the {resourceField} field on the {resourceName} resource."
+});
+```
+
+From other code:
+```c#
+throw new JsonApiException(new Error(HttpStatusCode.Conflict)
+{
+    Title = "Target resource was modified by another user.",
+    Detail = $"User {userName} changed the {resourceField} field on the {resourceName} resource."
+});
+```
+
+In both cases, the middleware will properly serialize it and return it as a JSON:API error.
+
+# Exception handling
+
+The translation of user-defined exceptions to error responses can be customized by registering your own handler.
+This handler is also the place to choose the log level and message, based on the exception type.
 
 ```c#
-public class CustomError : Error 
+public class ProductOutOfStockException : Exception
 {
-    public CustomError(int status, string title, string detail, string myProp)
-        : base(status, title, detail)
+    public int ProductId { get; }
+
+    public ProductOutOfStockException(int productId)
     {
-        MyCustomProperty = myProp;
+        ProductId = productId;
+    }
+}
+
+public class CustomExceptionHandler : ExceptionHandler
+{
+    public CustomExceptionHandler(ILoggerFactory loggerFactory, IJsonApiOptions options)
+        : base(loggerFactory, options)
+    {
     }
 
-    public string MyCustomProperty { get; set; }
+    protected override LogLevel GetLogLevel(Exception exception)
+    {
+        if (exception is ProductOutOfStockException)
+        {
+            return LogLevel.Information;
+        }
+
+        return base.GetLogLevel(exception);
+    }
+
+    protected override string GetLogMessage(Exception exception)
+    {
+        if (exception is ProductOutOfStockException productOutOfStock)
+        {
+            return $"Product {productOutOfStock.ProductId} is currently unavailable.";
+        }
+
+        return base.GetLogMessage(exception);
+    }
+
+    protected override ErrorDocument CreateErrorDocument(Exception exception)
+    {
+        if (exception is ProductOutOfStockException productOutOfStock)
+        {
+            return new ErrorDocument(new Error(HttpStatusCode.Conflict)
+            {
+                Title = "Product is temporarily available.",
+                Detail = $"Product {productOutOfStock.ProductId} cannot be ordered at the moment."
+            });
+        }
+
+        return base.CreateErrorDocument(exception);
+    }
 }
-```
 
-If you throw a `JsonApiException` that is unhandled, the middleware will properly serialize it and return it as a json:api error.
-
-```c#
-public void MyMethod() 
+public class Startup
 {
-    var error = new CustomError(507, "title", "detail", "custom");
-    throw new JsonApiException(error);
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddScoped<IExceptionHandler, CustomExceptionHandler>();
+    }
 }
 ```
-
-You can use the `IActionResult Error(Error error)` method to return a single error message, or you can use the `IActionResult Errors(ErrorCollection errors)` method to return a collection of errors from your controller.
-
-```c#
-[HttpPost]
-public override async Task<IActionResult> PostAsync([FromBody] MyEntity entity)
-{
-    if(_db.IsFull)
-        return Error(new CustomError("507", "Database is full.", "Theres no more room.", "Sorry."));
-            
-    if(model.Validations.IsValid == false)
-        return Errors(model.Validations.GetErrors());
-}
-```
-
-## Example: Including Links
-
-This example demonstrates one way you can include links with your error payloads.
-
-This example assumes that there is a support documentation site that provides additional information based on the HTTP Status Code.
-
-```c#
-public class LinkableError : Error 
-{
-    public LinkableError(int status, string title)
-        : base(status, title)
-    { }
-
-    public ErrorLink Links => "https://example.com/errors/" + Status;
-}
-
-var error = new LinkableError(401, "You're not allowed to do that.");
-throw new JsonApiException(error);
-```
-
-
-
-
-
-

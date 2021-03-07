@@ -1,10 +1,16 @@
-using JsonApiDotNetCore.Models;
+using JetBrains.Annotations;
+using JsonApiDotNetCore.Resources;
+using JsonApiDotNetCore.Resources.Annotations;
 
 namespace JsonApiDotNetCoreExample.Models
 {
-    public class User : Identifiable
+    [UsedImplicitly(ImplicitUseTargetFlags.Members)]
+    public sealed class User : Identifiable
     {
-        [Attr("username")] public string Username { get; set; }
-        [Attr("password")] public string Password { get; set; }
+        [Attr]
+        public string UserName { get; set; }
+
+        [Attr(Capabilities = AttrCapabilities.AllowCreate | AttrCapabilities.AllowChange)]
+        public string Password { get; set; }
     }
 }

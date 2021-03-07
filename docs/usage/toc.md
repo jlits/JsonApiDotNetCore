@@ -3,21 +3,29 @@
 ## [Relationships](resources/relationships.md)
 ## [Resource Definitions](resources/resource-definitions.md)
 
+# Reading data
+## [Filtering](reading/filtering.md)
+## [Sorting](reading/sorting.md)
+## [Pagination](reading/pagination.md)
+## [Sparse Fieldset Selection](reading/sparse-fieldset-selection.md)
+## [Including Relationships](reading/including-relationships.md)
+
+# Writing data
+## [Creating](writing/creating.md)
+## [Updating](writing/updating.md)
+## [Deleting](writing/deleting.md)
+## [Bulk/batch](writing/bulk-batch-operations.md)
+
 # [Resource Graph](resource-graph.md)
-# [Metadata](meta.md)
-# [Filtering](filtering.md)
 # [Options](options.md)
-# [Errors](errors.md)
-# [Including Relationships](including-relationships.md)
-# [Pagination](pagination.md)
 # [Routing](routing.md)
-# [Sorting](sorting.md)
-# [Sparse Field Selection](sparse-field-selection.md)
+# [Errors](errors.md)
+# [Metadata](meta.md)
 
 # Extensibility
 ## [Layer Overview](extensibility/layer-overview.md)
 ## [Controllers](extensibility/controllers.md)
-## [Services](extensibility/services.md)
-## [Repositories](extensibility/repositories.md)
+## [Resource Services](extensibility/services.md)
+## [Resource Repositories](extensibility/repositories.md)
 ## [Middleware](extensibility/middleware.md)
 ## [Custom Query Formats](extensibility/custom-query-formats.md)

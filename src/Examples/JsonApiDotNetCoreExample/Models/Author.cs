@@ -1,14 +1,20 @@
-using JsonApiDotNetCore.Models;
 using System.Collections.Generic;
+using JetBrains.Annotations;
+using JsonApiDotNetCore.Resources;
+using JsonApiDotNetCore.Resources.Annotations;
 
 namespace JsonApiDotNetCoreExample.Models
 {
-    public class Author : Identifiable
+    [UsedImplicitly(ImplicitUseTargetFlags.Members)]
+    public sealed class Author : Identifiable
     {
-        [Attr("name")]
-        public string Name { get; set; }
+        [Attr]
+        public string FirstName { get; set; }
 
-        [HasMany("articles")]
-        public List<Article> Articles { get; set; }
+        [Attr]
+        public string LastName { get; set; }
+
+        [HasMany]
+        public IList<Article> Articles { get; set; }
     }
 }

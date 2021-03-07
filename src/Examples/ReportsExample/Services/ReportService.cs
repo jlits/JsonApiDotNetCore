@@ -1,37 +1,46 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using JsonApiDotNetCore.Services;
 using Microsoft.Extensions.Logging;
+using ReportsExample.Models;
 
-public class ReportService : IGetAllService<Report>
+namespace ReportsExample.Services
 {
-    private ILogger<ReportService> _logger;
-
-    public ReportService(ILoggerFactory loggerFactory)
+    [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
+    public class ReportService : IGetAllService<Report>
     {
-        _logger = loggerFactory.CreateLogger<ReportService>();
-    }
+        private readonly ILogger<ReportService> _logger;
 
-    public Task<IEnumerable<Report>> GetAsync()
-    {
-        _logger.LogError("GetAsync");
+        public ReportService(ILoggerFactory loggerFactory)
+        {
+            _logger = loggerFactory.CreateLogger<ReportService>();
+        }
 
-        var task = new Task<IEnumerable<Report>>(() => Get());
-        
-        task.RunSynchronously(TaskScheduler.Default);
+        public Task<IReadOnlyCollection<Report>> GetAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("GetAsync");
 
-        return task;
-    }
+            var reports = GetReports();
 
-    private IEnumerable<Report> Get()
-    {
-        return new List<Report> {
-            new Report {
-                Title = "My Report",
-                ComplexType = new ComplexType {
-                    CompoundPropertyName = "value"
+            return Task.FromResult(reports);
+        }
+
+        private IReadOnlyCollection<Report> GetReports()
+        {
+            return new List<Report>
+            {
+                new Report
+                {
+                    Title = "Status Report",
+                    Statistics = new ReportStatistics
+                    {
+                        ProgressIndication = "Almost done",
+                        HoursSpent = 24
+                    }
                 }
-            }
-        };
+            };
+        }
     }
 }

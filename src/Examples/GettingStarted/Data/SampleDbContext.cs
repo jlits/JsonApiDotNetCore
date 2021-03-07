@@ -1,17 +1,22 @@
 using GettingStarted.Models;
-using GettingStarted.ResourceDefinitionExample;
+using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore;
 
-namespace GettingStarted
+namespace GettingStarted.Data
 {
+    [UsedImplicitly(ImplicitUseTargetFlags.Members)]
     public class SampleDbContext : DbContext
     {
-        public SampleDbContext(DbContextOptions<SampleDbContext> options)
-        : base(options)
-        { }
+        public DbSet<Book> Books { get; set; }
 
-        public DbSet<Article> Articles { get; set; }
-        public DbSet<Person> People { get; set; }
-        public DbSet<Model> Models { get; set; }
+        public SampleDbContext(DbContextOptions<SampleDbContext> options)
+            : base(options)
+        {
+        }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            builder.Entity<Person>();
+        }
     }
 }

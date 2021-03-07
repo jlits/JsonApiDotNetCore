@@ -1,97 +1,149 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
-using JsonApiDotNetCore.Models;
+using JsonApiDotNetCore.Configuration;
+using JsonApiDotNetCore.Resources;
 using JsonApiDotNetCore.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 namespace JsonApiDotNetCore.Controllers
 {
-    public class JsonApiController<T>
-    : JsonApiController<T, int> where T : class, IIdentifiable<int>
+    /// <summary>
+    /// The base class to derive resource-specific controllers from.
+    /// This class delegates all work to <see cref="BaseJsonApiController{TResource, TId}"/> but adds attributes for routing templates.
+    /// If you want to provide routing templates yourself, you should derive from BaseJsonApiController directly.
+    /// </summary>
+    /// <typeparam name="TResource">The resource type.</typeparam>
+    /// <typeparam name="TId">The resource identifier type.</typeparam>
+    public abstract class JsonApiController<TResource, TId> : BaseJsonApiController<TResource, TId> where TResource : class, IIdentifiable<TId>
     {
-        public JsonApiController(
-            IJsonApiContext jsonApiContext,
-            IResourceService<T, int> resourceService,
-            ILoggerFactory loggerFactory)
-            : base(jsonApiContext, resourceService, loggerFactory)
+        /// <inheritdoc />
+        protected JsonApiController(
+            IJsonApiOptions options,
+            ILoggerFactory loggerFactory,
+            IResourceService<TResource, TId> resourceService)
+            : base(options, loggerFactory, resourceService)
         { }
 
-        public JsonApiController(
-            IJsonApiContext jsonApiContext,
-            IResourceService<T, int> resourceService)
-            : base(jsonApiContext, resourceService)
+        /// <inheritdoc />
+        protected JsonApiController(
+            IJsonApiOptions options,
+            ILoggerFactory loggerFactory,
+            IGetAllService<TResource, TId> getAll = null,
+            IGetByIdService<TResource, TId> getById = null,
+            IGetSecondaryService<TResource, TId> getSecondary = null,
+            IGetRelationshipService<TResource, TId> getRelationship = null,
+            ICreateService<TResource, TId> create = null,
+            IAddToRelationshipService<TResource, TId> addToRelationship = null,
+            IUpdateService<TResource, TId> update = null,
+            ISetRelationshipService<TResource, TId> setRelationship = null,
+            IDeleteService<TResource, TId> delete = null,
+            IRemoveFromRelationshipService<TResource, TId> removeFromRelationship = null)
+            : base(options, loggerFactory,getAll, getById, getSecondary, getRelationship, create, addToRelationship, update,
+                setRelationship, delete, removeFromRelationship)
         { }
 
-        public JsonApiController(
-            IJsonApiContext jsonApiContext,
-            IGetAllService<T, int> getAll = null,
-            IGetByIdService<T, int> getById = null,
-            IGetRelationshipService<T, int> getRelationship = null,
-            IGetRelationshipsService<T, int> getRelationships = null,
-            ICreateService<T, int> create = null,
-            IUpdateService<T, int> update = null,
-            IUpdateRelationshipService<T, int> updateRelationships = null,
-            IDeleteService<T, int> delete = null
-        ) : base(jsonApiContext, getAll, getById, getRelationship, getRelationships, create, update, updateRelationships, delete) { }
+        /// <inheritdoc />
+        [HttpGet]
+        public override async Task<IActionResult> GetAsync(CancellationToken cancellationToken)
+        {
+            return await base.GetAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpGet("{id}")]
+        public override async Task<IActionResult> GetAsync(TId id, CancellationToken cancellationToken)
+        {
+            return await base.GetAsync(id, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpGet("{id}/{relationshipName}")]
+        public override async Task<IActionResult> GetSecondaryAsync(TId id, string relationshipName, CancellationToken cancellationToken)
+        {
+            return await base.GetSecondaryAsync(id, relationshipName, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpGet("{id}/relationships/{relationshipName}")]
+        public override async Task<IActionResult> GetRelationshipAsync(TId id, string relationshipName, CancellationToken cancellationToken)
+        {
+            return await base.GetRelationshipAsync(id, relationshipName, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpPost]
+        public override async Task<IActionResult> PostAsync([FromBody] TResource resource, CancellationToken cancellationToken)
+        {
+            return await base.PostAsync(resource, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpPost("{id}/relationships/{relationshipName}")]
+        public override async Task<IActionResult> PostRelationshipAsync(
+            TId id, string relationshipName, [FromBody] ISet<IIdentifiable> secondaryResourceIds, CancellationToken cancellationToken)
+        {
+            return await base.PostRelationshipAsync(id, relationshipName, secondaryResourceIds, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpPatch("{id}")]
+        public override async Task<IActionResult> PatchAsync(TId id, [FromBody] TResource resource, CancellationToken cancellationToken)
+        {
+            return await base.PatchAsync(id, resource, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpPatch("{id}/relationships/{relationshipName}")]
+        public override async Task<IActionResult> PatchRelationshipAsync(
+            TId id, string relationshipName, [FromBody] object secondaryResourceIds, CancellationToken cancellationToken)
+        {
+            return await base.PatchRelationshipAsync(id, relationshipName, secondaryResourceIds, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpDelete("{id}")]
+        public override async Task<IActionResult> DeleteAsync(TId id, CancellationToken cancellationToken)
+        {
+            return await base.DeleteAsync(id, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        [HttpDelete("{id}/relationships/{relationshipName}")]
+        public override async Task<IActionResult> DeleteRelationshipAsync(TId id, string relationshipName, [FromBody] ISet<IIdentifiable> secondaryResourceIds, CancellationToken cancellationToken)
+        {
+            return await base.DeleteRelationshipAsync(id, relationshipName, secondaryResourceIds, cancellationToken);
+        }
     }
 
-    public class JsonApiController<T, TId>
-    : BaseJsonApiController<T, TId> where T : class, IIdentifiable<TId>
+    /// <inheritdoc />
+    public abstract class JsonApiController<TResource> : JsonApiController<TResource, int> where TResource : class, IIdentifiable<int>
     {
-        public JsonApiController(
-            IJsonApiContext jsonApiContext,
-            IResourceService<T, TId> resourceService,
-            ILoggerFactory loggerFactory) 
-        : base(jsonApiContext, resourceService)
+        /// <inheritdoc />
+        protected JsonApiController(
+            IJsonApiOptions options,
+            ILoggerFactory loggerFactory,
+            IResourceService<TResource, int> resourceService)
+            : base(options, loggerFactory, resourceService)
         { }
 
-        public JsonApiController(
-            IJsonApiContext jsonApiContext,
-            IResourceService<T, TId> resourceService)
-        : base(jsonApiContext, resourceService)
+        /// <inheritdoc />
+        protected JsonApiController(
+            IJsonApiOptions options,
+            ILoggerFactory loggerFactory,
+            IGetAllService<TResource, int> getAll = null,
+            IGetByIdService<TResource, int> getById = null,
+            IGetSecondaryService<TResource, int> getSecondary = null,
+            IGetRelationshipService<TResource, int> getRelationship = null,
+            ICreateService<TResource, int> create = null,
+            IAddToRelationshipService<TResource, int> addToRelationship = null,
+            IUpdateService<TResource, int> update = null,
+            ISetRelationshipService<TResource, int> setRelationship = null,
+            IDeleteService<TResource, int> delete = null,
+            IRemoveFromRelationshipService<TResource, int> removeFromRelationship = null)
+            : base(options, loggerFactory, getAll, getById, getSecondary, getRelationship, create, addToRelationship, update,
+                setRelationship, delete, removeFromRelationship)
         { }
-
-        public JsonApiController(
-           IJsonApiContext jsonApiContext,
-            IGetAllService<T, TId> getAll = null,
-            IGetByIdService<T, TId> getById = null,
-            IGetRelationshipService<T, TId> getRelationship = null,
-            IGetRelationshipsService<T, TId> getRelationships = null,
-            ICreateService<T, TId> create = null,
-            IUpdateService<T, TId> update = null,
-            IUpdateRelationshipService<T, TId> updateRelationships = null,
-            IDeleteService<T, TId> delete = null
-        ) : base(jsonApiContext, getAll, getById, getRelationship, getRelationships, create, update, updateRelationships, delete) { }
-
-        [HttpGet]
-        public override async Task<IActionResult> GetAsync() => await base.GetAsync();
-
-        [HttpGet("{id}")]
-        public override async Task<IActionResult> GetAsync(TId id) => await base.GetAsync(id);
-
-        [HttpGet("{id}/relationships/{relationshipName}")]
-        public override async Task<IActionResult> GetRelationshipsAsync(TId id, string relationshipName)
-            => await base.GetRelationshipsAsync(id, relationshipName);
-
-        [HttpGet("{id}/{relationshipName}")]
-        public override async Task<IActionResult> GetRelationshipAsync(TId id, string relationshipName)
-            => await base.GetRelationshipAsync(id, relationshipName);
-
-        [HttpPost]
-        public override async Task<IActionResult> PostAsync([FromBody] T entity)
-            => await base.PostAsync(entity);
-
-        [HttpPatch("{id}")]
-        public override async Task<IActionResult> PatchAsync(TId id, [FromBody] T entity)
-            => await base.PatchAsync(id, entity);
-
-        [HttpPatch("{id}/relationships/{relationshipName}")]
-        public override async Task<IActionResult> PatchRelationshipsAsync(
-            TId id, string relationshipName, [FromBody] List<ResourceObject> relationships)
-            => await base.PatchRelationshipsAsync(id, relationshipName, relationships);
-
-        [HttpDelete("{id}")]
-        public override async Task<IActionResult> DeleteAsync(TId id) => await base.DeleteAsync(id);
     }
 }

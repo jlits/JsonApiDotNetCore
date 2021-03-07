@@ -1,47 +1,35 @@
-﻿using System;
-using JsonApiDotNetCore.Models;
+using System.Collections.Generic;
+using JetBrains.Annotations;
+using JsonApiDotNetCore.Resources;
+using JsonApiDotNetCore.Resources.Annotations;
 
 namespace JsonApiDotNetCoreExample.Models
 {
-    public class TodoItem : Identifiable
+    [UsedImplicitly(ImplicitUseTargetFlags.Members)]
+    public sealed class TodoItem : Identifiable, IIsLockable
     {
-        public TodoItem()
-        {
-            GuidProperty = Guid.NewGuid();
-        }
+        public bool IsLocked { get; set; }
 
-        [Attr("description")]
+        [Attr]
         public string Description { get; set; }
 
-        [Attr("ordinal")]
-        public long Ordinal { get; set; }
+        [HasOne]
+        public Person Owner { get; set; }
 
-        [Attr("guid-property")]
-        public Guid GuidProperty { get; set; }
+        [HasOne]
+        public Person Assignee { get; set; }
 
-        [Attr("created-date")]
-        public DateTime CreatedDate { get; set; }
+        [HasOne]
+        public Person OneToOnePerson { get; set; }
 
-        [Attr("achieved-date", isFilterable: false, isSortable: false)]
-        public DateTime? AchievedDate { get; set; }
+        [HasMany]
+        public ISet<Person> StakeHolders { get; set; }
 
+        // cyclical to-many structure
+        [HasOne]
+        public TodoItem ParentTodo { get; set; }
 
-        [Attr("updated-date")]
-        public DateTime? UpdatedDate { get; set; }
-
-
-        
-        public int? OwnerId { get; set; }
-        public int? AssigneeId { get; set; }
-        public Guid? CollectionId { get; set; }
-
-        [HasOne("owner")]
-        public virtual Person Owner { get; set; }
-
-        [HasOne("assignee")]
-        public virtual Person Assignee { get; set; }
-
-        [HasOne("collection")]
-        public virtual TodoItemCollection Collection { get; set; }
+        [HasMany]
+        public IList<TodoItem> ChildTodoItems { get; set; }
     }
 }

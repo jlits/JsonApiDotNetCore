@@ -10,21 +10,21 @@
             "dest": "api",
             "disableGitFeatures": false,
             "properties": {
-                "targetFramework": "netstandard2.0"
+                "targetFramework": "netcoreapp3.1"
             }
         }
     ],
     "build": {
         "content": [
             {
-                "files": [ "api/**.yml", "api/index.md" ]
-            },
-            {
                 "files": [
+                    "api/**.yml",
+                    "api/index.md",
                     "getting-started/**.md",
                     "getting-started/**/toc.yml",
                     "usage/**.md",
                     "request-examples/**.md",
+                    "internals/**.md",
                     "toc.yml",
                     "*.md"
                 ]

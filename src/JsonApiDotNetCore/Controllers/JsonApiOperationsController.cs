@@ -1,60 +1,34 @@
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
-using JsonApiDotNetCore.Models.Operations;
-using JsonApiDotNetCore.Services.Operations;
+using JsonApiDotNetCore.AtomicOperations;
+using JsonApiDotNetCore.Configuration;
+using JsonApiDotNetCore.Middleware;
+using JsonApiDotNetCore.Resources;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace JsonApiDotNetCore.Controllers
 {
     /// <summary>
-    /// A controller to be used for bulk operations as defined in the json:api 1.1 specification
+    /// The base class to derive atomic:operations controllers from.
+    /// This class delegates all work to <see cref="BaseJsonApiOperationsController"/> but adds attributes for routing templates.
+    /// If you want to provide routing templates yourself, you should derive from BaseJsonApiOperationsController directly.
     /// </summary>
-    public class JsonApiOperationsController : ControllerBase
+    public abstract class JsonApiOperationsController : BaseJsonApiOperationsController
     {
-        private readonly IOperationsProcessor _operationsProcessor;
-
-        /// <param name="operationsProcessor">
-        /// The processor to handle bulk operations.
-        /// </param>
-        public JsonApiOperationsController(IOperationsProcessor operationsProcessor)
+        protected JsonApiOperationsController(IJsonApiOptions options, ILoggerFactory loggerFactory,
+            IOperationsProcessor processor, IJsonApiRequest request, ITargetedFields targetedFields)
+            : base(options, loggerFactory, processor, request, targetedFields)
         {
-            _operationsProcessor = operationsProcessor;
         }
 
-        /// <summary>
-        /// Bulk endpoint for json:api operations
-        /// </summary>
-        /// <param name="doc">
-        /// A json:api operations request document
-        /// </param>
-        /// <example>
-        /// <code>
-        /// PATCH /api/bulk HTTP/1.1
-        /// Content-Type: application/vnd.api+json
-        /// 
-        /// {
-        ///   "operations": [{
-        ///     "op": "add",
-        ///     "ref": {
-        ///       "type": "authors"
-        ///     },
-        ///     "data": {
-        ///       "type": "authors",
-        ///       "attributes": {
-        ///         "name": "jaredcnance"
-        ///       }
-        ///     }
-        ///   }]
-        /// }
-        /// </code>
-        /// </example>
-        [HttpPatch]
-        public virtual async Task<IActionResult> PatchAsync([FromBody] OperationsDocument doc)
+        /// <inheritdoc />
+        [HttpPost]
+        public override async Task<IActionResult> PostOperationsAsync([FromBody] IList<OperationContainer> operations,
+            CancellationToken cancellationToken)
         {
-            if (doc == null) return new StatusCodeResult(422);
-
-            var results = await _operationsProcessor.ProcessAsync(doc.Operations);
-
-            return Ok(new OperationsDocument(results));
+            return await base.PostOperationsAsync(operations, cancellationToken);
         }
     }
 }

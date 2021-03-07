@@ -1,17 +1,17 @@
-﻿using System.Collections.Generic;
-using JsonApiDotNetCore.Models;
+using System.Collections.Generic;
+using JsonApiDotNetCore.Serialization.Objects;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace UnitTests.Models
 {
-    public class RelationshipDataTests
+    public sealed class RelationshipDataTests
     {
         [Fact]
-        public void Setting_ExposedData_To_List_Sets_ManyData()
+        public void Setting_ExposeData_To_List_Sets_ManyData()
         {
-            // arrange
-            var relationshipData = new RelationshipData();
+            // Arrange
+            var relationshipData = new RelationshipEntry();
             var relationships = new List<ResourceIdentifierObject> {
                 new ResourceIdentifierObject {
                     Id = "9",
@@ -19,22 +19,22 @@ namespace UnitTests.Models
                 }
             };
 
-            // act 
-            relationshipData.ExposedData = relationships;
+            // Act 
+            relationshipData.Data = relationships;
 
-            // assert
+            // Assert
             Assert.NotEmpty(relationshipData.ManyData);
             Assert.Equal("authors", relationshipData.ManyData[0].Type);
             Assert.Equal("9", relationshipData.ManyData[0].Id);
-            Assert.True(relationshipData.IsHasMany);
+            Assert.True(relationshipData.IsManyData);
         }
 
         [Fact]
-        public void Setting_ExposedData_To_JArray_Sets_ManyData()
+        public void Setting_ExposeData_To_JArray_Sets_ManyData()
         {
-            // arrange
-            var relationshipData = new RelationshipData();
-            var relationshipsJson = @"[
+            // Arrange
+            var relationshipData = new RelationshipEntry();
+            const string relationshipsJson = @"[
                 {
                     ""type"": ""authors"",
                     ""id"": ""9""
@@ -43,56 +43,56 @@ namespace UnitTests.Models
 
             var relationships = JArray.Parse(relationshipsJson);
 
-            // act 
-            relationshipData.ExposedData = relationships;
+            // Act 
+            relationshipData.Data = relationships;
 
-            // assert
+            // Assert
             Assert.NotEmpty(relationshipData.ManyData);
             Assert.Equal("authors", relationshipData.ManyData[0].Type);
             Assert.Equal("9", relationshipData.ManyData[0].Id);
-            Assert.True(relationshipData.IsHasMany);
+            Assert.True(relationshipData.IsManyData);
         }
 
         [Fact]
-        public void Setting_ExposedData_To_RIO_Sets_SingleData()
+        public void Setting_ExposeData_To_RIO_Sets_SingleData()
         {
-            // arrange
-            var relationshipData = new RelationshipData();
+            // Arrange
+            var relationshipData = new RelationshipEntry();
             var relationship = new ResourceIdentifierObject {
                 Id = "9",
                 Type = "authors"
             };
 
-            // act 
-            relationshipData.ExposedData = relationship;
+            // Act 
+            relationshipData.Data = relationship;
 
-            // assert
+            // Assert
             Assert.NotNull(relationshipData.SingleData);
             Assert.Equal("authors", relationshipData.SingleData.Type);
             Assert.Equal("9", relationshipData.SingleData.Id);
-            Assert.False(relationshipData.IsHasMany);
+            Assert.False(relationshipData.IsManyData);
         }
 
         [Fact]
-        public void Setting_ExposedData_To_JObject_Sets_SingleData()
+        public void Setting_ExposeData_To_JObject_Sets_SingleData()
         {
-            // arrange
-            var relationshipData = new RelationshipData();
-            var relationshipJson = @"{
+            // Arrange
+            var relationshipData = new RelationshipEntry();
+            const string relationshipJson = @"{
                     ""id"": ""9"",
                     ""type"": ""authors""
                 }";
 
             var relationship = JObject.Parse(relationshipJson);
 
-            // act 
-            relationshipData.ExposedData = relationship;
+            // Act 
+            relationshipData.Data = relationship;
 
-            // assert
+            // Assert
             Assert.NotNull(relationshipData.SingleData);
             Assert.Equal("authors", relationshipData.SingleData.Type);
             Assert.Equal("9", relationshipData.SingleData.Id);
-            Assert.False(relationshipData.IsHasMany);
+            Assert.False(relationshipData.IsManyData);
         }
     }
 }

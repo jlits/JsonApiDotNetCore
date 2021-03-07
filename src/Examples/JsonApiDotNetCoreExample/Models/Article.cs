@@ -1,21 +1,28 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
-using JsonApiDotNetCore.Models;
+using JetBrains.Annotations;
+using JsonApiDotNetCore.Resources;
+using JsonApiDotNetCore.Resources.Annotations;
 
 namespace JsonApiDotNetCoreExample.Models
 {
-    public class Article : Identifiable
+    [UsedImplicitly(ImplicitUseTargetFlags.Members)]
+    public sealed class Article : Identifiable
     {
-        [Attr("name")]
-        public string Name { get; set; }
+        [Attr]
+        public string Caption { get; set; }
 
-        [HasOne("author")]
-        public Author Author { get; set; }
-        public int AuthorId { get; set; }
+        [Attr]
+        public string Url { get; set; }
 
         [NotMapped]
         [HasManyThrough(nameof(ArticleTags))]
-        public List<Tag> Tags { get; set; }
-        public List<ArticleTag> ArticleTags { get; set; }
+        public ISet<Tag> Tags { get; set; }
+        public ISet<ArticleTag> ArticleTags { get; set; }
+
+        [NotMapped]
+        [HasManyThrough(nameof(IdentifiableArticleTags))]
+        public ICollection<Tag> IdentifiableTags { get; set; }
+        public ICollection<IdentifiableArticleTag> IdentifiableArticleTags { get; set; }
     }
 }

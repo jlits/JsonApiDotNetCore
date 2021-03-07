@@ -1,28 +1,60 @@
 # Resource Definitions
 
 In order to improve the developer experience, we have introduced a type that makes
-common modifications to the default API behavior easier. `ResourceDefinition` was first introduced in v2.3.4.
+common modifications to the default API behavior easier. Resource definitions were first introduced in v2.3.4.
 
-## Runtime Attribute Filtering
+Resource definitions are resolved from the dependency injection container, so you can inject dependencies in their constructor.
 
-_since v2.3.4_
+## Customizing query clauses
 
-There are some cases where you want attributes excluded from your resource response.
-For example, you may accept some form data that shouldn't be exposed after creation.
-This kind of data may get hashed in the database and should never be exposed to the client.
+_since v4.0_
 
-Using the techniques described below, you can achieve the following reques/response behavior:
+For various reasons (see examples below) you may need to change parts of the query, depending on resource type.
+`JsonApiResourceDefinition<TResource>` (which is an empty implementation of `IResourceDefinition<TResource>`) provides overridable methods that pass you the result of query string parameter parsing.
+The value returned by you determines what will be used to execute the query.
+
+An intermediate format (`QueryExpression` and derived types) is used, which enables us to separate JSON:API implementation 
+from Entity Framework Core `IQueryable` execution.
+
+### Excluding fields
+
+There are some cases where you want attributes (or relationships) conditionally excluded from your resource response.
+For example, you may accept some sensitive data that should only be exposed to administrators after creation.
+
+Note: to exclude attributes unconditionally, use `[Attr(Capabilities = ~AttrCapabilities.AllowView)]`.
+
+```c#
+public class UserDefinition : JsonApiResourceDefinition<User>
+{
+    public UserDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
+
+    public override SparseFieldSetExpression OnApplySparseFieldSet(
+        SparseFieldSetExpression existingSparseFieldSet)
+    {
+        if (IsAdministrator)
+        {
+            return existingSparseFieldSet;
+        }
+
+        return existingSparseFieldSet.Excluding<User>(
+            user => user.Password, ResourceGraph);
+    }
+}
+```
+
+Using this technique, you can achieve the following request/response behavior:
 
 ```http
 POST /users HTTP/1.1
 Content-Type: application/vnd.api+json
-Accept: application/vnd.api+json
 
 {
   "data": {
     "type": "users",
     "attributes": {
-      "account-number": "1234567890",
+      "password": "secret",
       "name": "John Doe"
     }
   }
@@ -45,83 +77,162 @@ Content-Type: application/vnd.api+json
 }
 ```
 
-### Single Attribute
+## Default sort order
+
+You can define the default sort order if no `sort` query string parameter is provided.
 
 ```c#
-public class ModelResource : ResourceDefinition<Model>
+public class AccountDefinition : JsonApiResourceDefinition<Account>
 {
-    protected override List<AttrAttribute> OutputAttrs()
-        => Remove(m => m.AccountNumber);
+    public AccountDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
+
+    public override SortExpression OnApplySort(SortExpression existingSort)
+    {
+        if (existingSort != null)
+        {
+            return existingSort;
+        }
+
+        return CreateSortExpressionFromLambda(new PropertySortOrder
+        {
+            (account => account.Name, ListSortDirection.Ascending),
+            (account => account.ModifiedAt, ListSortDirection.Descending)
+        });
+    }
 }
 ```
 
-### Multiple Attributes
+## Enforce page size
+
+You may want to enforce pagination on large database tables.
 
 ```c#
-public class ModelResource : ResourceDefinition<Model>
+public class AccessLogDefinition : JsonApiResourceDefinition<AccessLog>
 {
-    protected override List<AttrAttribute> OutputAttrs()
-        => Remove(m => new { m.AccountNumber, m.Password });
+    public AccessLogDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
+
+    public override PaginationExpression OnApplyPagination(
+        PaginationExpression existingPagination)
+    {
+        var maxPageSize = new PageSize(10);
+
+        if (existingPagination != null)
+        {
+            var pageSize = existingPagination.PageSize?.Value <= maxPageSize.Value
+                ? existingPagination.PageSize
+                : maxPageSize;
+
+            return new PaginationExpression(existingPagination.PageNumber, pageSize);
+        }
+
+        return new PaginationExpression(PageNumber.ValueOne, maxPageSize);
+    }
 }
 ```
 
-### Derived ResourceDefinitions
+## Exclude soft-deleted resources
 
-If you want to inherit from a different `ResourceDefinition`, these attributes can be composed like so:
+Soft-deletion sets `IsSoftDeleted` to `true` instead of actually deleting the record, so you may want to always filter them out.
 
 ```c#
-public class BaseResource : ResourceDefinition<Model>
+public class AccountDefinition : JsonApiResourceDefinition<Account>
 {
-    protected override List<AttrAttribute> OutputAttrs()
-        => Remove(m => m.TenantId);
-}
+    public AccountDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
 
-public class AccountResource : ResourceDefinition<Account>
-{
-    protected override List<AttrAttribute> OutputAttrs()
-        => Remove(m => m.AccountNumber, from: base.OutputAttrs());
+    public override FilterExpression OnApplyFilter(FilterExpression existingFilter)
+    {
+        var resourceContext = ResourceGraph.GetResourceContext<Account>();
+
+        var isSoftDeletedAttribute =
+            resourceContext.Attributes.Single(a =>
+                a.Property.Name == nameof(Account.IsSoftDeleted));
+
+        var isNotSoftDeleted = new ComparisonExpression(ComparisonOperator.Equals,
+            new ResourceFieldChainExpression(isSoftDeletedAttribute),
+            new LiteralConstantExpression(bool.FalseString));
+
+        return existingFilter == null
+            ? (FilterExpression) isNotSoftDeleted
+            : new LogicalExpression(LogicalOperator.And,
+                new[] {isNotSoftDeleted, existingFilter});
+    }
 }
 ```
 
-## Default Sort
-
-_since v3.0.0_
-
-You can define the default sort behavior if no `sort` query is provided.
+## Block including related resources
 
 ```c#
-public class AccountResource : ResourceDefinition<Account>
+public class EmployeeDefinition : JsonApiResourceDefinition<Employee>
 {
-    protected override PropertySortOrder GetDefaultSortOrder()
-        => new PropertySortOrder {
-            (t => t.Prop, SortDirection.Ascending),
-            (t => t.Prop2, SortDirection.Descending),
+    public EmployeeDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
+
+    public override IReadOnlyCollection<IncludeElementExpression> OnApplyIncludes(
+        IReadOnlyCollection<IncludeElementExpression> existingIncludes)
+    {
+        if (existingIncludes.Any(include =>
+            include.Relationship.Property.Name == nameof(Employee.Manager)))
+        {
+            throw new JsonApiException(new Error(HttpStatusCode.BadRequest)
+            {
+                Title = "Including the manager of employees is not permitted."
+            });
+        }
+
+        return existingIncludes;
+    }
+}
+```
+
+## Custom query string parameters
+
+_since v3_
+
+You can define additional query string parameters with the LINQ expression that should be used.
+If the key is present in a query string, the supplied LINQ expression will be added to the database query.
+
+Note this directly influences the Entity Framework Core `IQueryable`. As opposed to using `OnApplyFilter`, this enables the full range of EF Core functionality. 
+But it only works on primary resource endpoints (for example: /articles, but not on /blogs/1/articles or /blogs?include=articles).
+
+```c#
+public class ItemDefinition : JsonApiResourceDefinition<Item>
+{
+    public ItemDefinition(IResourceGraph resourceGraph) : base(resourceGraph)
+    {
+    }
+
+    public override QueryStringParameterHandlers<Item>
+        OnRegisterQueryableHandlersForQueryStringParameters()
+    {
+        return new QueryStringParameterHandlers<Item>
+        {
+            ["isActive"] = (source, parameterValue) => source
+                .Include(item => item.Children)
+                .Where(item => item.LastUpdateTime > DateTime.Now.AddMonths(-1)),
+            ["isHighRisk"] = FilterByHighRisk
         };
+    }
+
+    private static IQueryable<Item> FilterByHighRisk(IQueryable<Item> source,
+        StringValues parameterValue)
+    {
+        bool isFilterOnHighRisk = bool.Parse(parameterValue);
+
+        return isFilterOnHighRisk
+            ? source.Where(item => item.RiskLevel >= 5)
+            : source.Where(item => item.RiskLevel < 5);
+    }
 }
 ```
 
-## Custom Query Filters
-
-_since v3.0.0_
-
-You can define additional query parameters and the query that should be used.
-If the key is present in a filter request, the supplied query will be used rather than the default behavior.
-
-```c#
-public class ItemResource : ResourceDefinition<Item>
-{
-    // handles queries like: ?filter[was-active-on]=2018-10-15T01:25:52Z
-    public override QueryFilters GetQueryFilters()
-        => new QueryFilters {            
-            { "was-active-on", (items, value) => DateTime.TryParse(value, out dateValue)
-                ? items.Where(i => i.Expired == null || dateValue < i.Expired)
-                : throw new JsonApiException(400, $"'{value}' is not a valid date.")
-            }
-        };
-}
-```
-
-## Using ResourceDefinitions Prior to v3
+## Using Resource Definitions prior to v3
 
 Prior to the introduction of auto-discovery, you needed to register the
 `ResourceDefinition` on the container yourself:

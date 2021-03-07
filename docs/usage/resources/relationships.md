@@ -1,56 +1,104 @@
 # Relationships
 
-In order for navigation properties to be identified in the model, 
+In order for navigation properties to be identified in the model,
 they should be labeled with the appropriate attribute (either `HasOne`, `HasMany` or `HasManyThrough`).
 
 ## HasOne
 
-Dependent relationships should contain a property in the form `{RelationshipName}Id`. 
-For example, a TodoItem may have an Owner and so the Id attribute should be OwnerId.
+This exposes a to-one relationship.
 
 ```c#
-public class TodoItem : Identifiable<int>
+public class TodoItem : Identifiable
 {
-    [Attr("description")]
-    public string Description { get; set; }
-
-    [HasOne("owner")]
-    public virtual Person Owner { get; set; }
-    public int OwnerId { get; set; }
+    [HasOne]
+    public Person Owner { get; set; }
 }
 ```
 
-The convention used used to locate the foreign key property (e.g. `OwnerId`) can be changed on
-the @JsonApiDotNetCore.Configuration.JsonApiOptions#JsonApiDotNetCore_Configuration_JsonApiOptions_RelatedIdMapper
-
 ## HasMany
 
-```c#
-public class Person : Identifiable<int>
-{
-    [Attr("first-name")]
-    public string FirstName { get; set; }
+This exposes a to-many relationship.
 
-    [HasMany("todo-items")]
-    public virtual List<TodoItem> TodoItems { get; set; }
+```c#
+public class Person : Identifiable
+{
+    [HasMany]
+    public ICollection<TodoItem> TodoItems { get; set; }
 }
 ```
 
 ## HasManyThrough
 
-Currently EntityFrameworkCore [does not support](https://github.com/aspnet/EntityFrameworkCore/issues/1368) Many-to-Many relationships without a join entity. 
-For this reason, we have decided to fill this gap by allowing applications to declare a relationships as `HasManyThrough`. 
-JsonApiDotNetCore will expose this attribute to the client the same way as any other `HasMany` attribute.
-However, under the covers it will use the join type and EntityFramework's APIs to get and set the relationship.
+Currently, Entity Framework Core [does not support](https://github.com/aspnet/EntityFrameworkCore/issues/1368) many-to-many relationships without a join entity.
+For this reason, we have decided to fill this gap by allowing applications to declare a relationship as `HasManyThrough`.
+JsonApiDotNetCore will expose this relationship to the client the same way as any other `HasMany` attribute.
+However, under the covers it will use the join type and Entity Framework Core's APIs to get and set the relationship.
 
 ```c#
 public class Article : Identifiable
 {
-    [NotMapped] // ← tells EF to ignore this property
-    [HasManyThrough(nameof(ArticleTags))] // ← tells JADNC to use this as an alias to ArticleTags.Tags
-    public List<Tag> Tags { get; set; }
+    [NotMapped] // tells Entity Framework Core to ignore this property
+    [HasManyThrough(nameof(ArticleTags))] // tells JsonApiDotNetCore to use the join table below
+    public ICollection<Tag> Tags { get; set; }
 
-    // this is the EF join relationship
-    public List<ArticleTag> ArticleTags { get; set; }
+    // this is the Entity Framework Core navigation to the join table
+    public ICollection<ArticleTag> ArticleTags { get; set; }
+}
+```
+
+## Name
+
+There are two ways the exposed relationship name is determined:
+
+1. Using the configured [naming convention](~/usage/options.md#custom-serializer-settings).
+
+2. Individually using the attribute's constructor.
+```c#
+public class TodoItem : Identifiable
+{
+    [HasOne(PublicName = "item-owner")]
+    public Person Owner { get; set; }
+}
+```
+
+## Includibility
+
+Relationships can be marked to disallow including them using the `?include=` query string parameter. When not allowed, it results in an HTTP 400 response.
+
+```c#
+public class TodoItem : Identifiable
+{
+    [HasOne(CanInclude: false)]
+    public Person Owner { get; set; }
+}
+```
+
+# Eager loading
+
+_since v4.0_
+
+Your resource may expose a calculated property, whose value depends on a related entity that is not exposed as a JSON:API resource.
+So for the calculated property to be evaluated correctly, the related entity must always be retrieved. You can achieve that using `EagerLoad`, for example:
+
+```c#
+public class ShippingAddress : Identifiable
+{
+    [Attr]
+    public string Street { get; set; }
+
+    [Attr]
+    public string CountryName
+    {
+        get { return Country.DisplayName; }
+    }
+
+    [EagerLoad] // not exposed as resource, but adds .Include("Country") to the query
+    public Country Country { get; set; }
+}
+
+public class Country
+{
+    public string IsoCode { get; set; }
+    public string DisplayName { get; set; }
 }
 ```

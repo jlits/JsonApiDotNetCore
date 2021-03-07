@@ -1,49 +1,34 @@
-using System;
 using System.Collections.Generic;
-using JsonApiDotNetCore.Models;
-using JsonApiDotNetCore.Services;
+using JetBrains.Annotations;
+using JsonApiDotNetCore.Resources;
+using JsonApiDotNetCore.Resources.Annotations;
 
 namespace JsonApiDotNetCoreExample.Models
 {
-    public class PersonRole : Identifiable
+    [UsedImplicitly(ImplicitUseTargetFlags.Members)]
+    public sealed class Person : Identifiable, IIsLockable
     {
-        [HasOne("person")]
-        public Person Person { get; set; }
-    }
+        public bool IsLocked { get; set; }
 
-    public class Person : Identifiable, IHasMeta
-    {
-        [Attr("first-name")]
+        [Attr]
         public string FirstName { get; set; }
 
-        [Attr("last-name")]
+        [Attr]
         public string LastName { get; set; }
 
-        [Attr("age")]
-        public int Age { get; set; }
+        [HasMany]
+        public ISet<TodoItem> TodoItems { get; set; }
 
-        [HasMany("todo-items")]
-        public virtual List<TodoItem> TodoItems { get; set; }
+        [HasMany]
+        public ISet<TodoItem> AssignedTodoItems { get; set; }
 
-        [HasMany("assigned-todo-items")]
-        public virtual List<TodoItem> AssignedTodoItems { get; set; }
+        [HasOne]
+        public TodoItem OneToOneTodoItem { get; set; }
 
-        [HasMany("todo-collections")]
-        public virtual List<TodoItemCollection> TodoItemCollections { get; set; }
+        [HasOne]
+        public TodoItem StakeHolderTodoItem { get; set; }
 
-        [HasOne("role")]
-        public virtual PersonRole Role { get; set; }
-        public int? PersonRoleId { get; set; }
-
-        [HasOne("unincludeable-item", documentLinks: Link.All, canInclude: false)]
-        public virtual TodoItem UnIncludeableItem { get; set; }
-
-        public Dictionary<string, object> GetMeta(IJsonApiContext context)
-        {
-            return new Dictionary<string, object> {
-                { "copyright", "Copyright 2015 Example Corp." },
-                { "authors", new string[] { "Jared Nance" } }
-            };
-        }
+        [HasOne]
+        public Passport Passport { get; set; }
     }
 }

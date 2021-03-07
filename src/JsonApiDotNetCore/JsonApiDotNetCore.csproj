@@ -1,48 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <VersionPrefix>3.0.1</VersionPrefix>
-    <TargetFrameworks>$(NetStandardVersion)</TargetFrameworks>
-    <AssemblyName>JsonApiDotNetCore</AssemblyName>
-    <PackageId>JsonApiDotNetCore</PackageId>
-    <LangVersion>7.2</LangVersion>
+    <VersionPrefix>4.0.4</VersionPrefix>
+    <TargetFramework>$(NetCoreAppVersion)</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageTags>jsonapi;dotnet core;emberjs;ember</PackageTags>
+    <PackageTags>jsonapidotnetcore;jsonapi;json:api;dotnet;asp.net</PackageTags>
+    <Description>A framework for building JSON:API compliant web APIs. The ultimate goal of this library is to eliminate as much boilerplate as possible by offering out-of-the-box features such as sorting, filtering and pagination. You just need to focus on defining the resources and implementing your custom business logic. This library has been designed around dependency injection making extensibility incredibly easy.</Description>
     <PackageProjectUrl>https://github.com/json-api-dotnet/JsonApiDotNetCore</PackageProjectUrl>
-    <PackageLicenseUrl>https://github.com/json-api-dotnet/JsonApiDotNetCore/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/json-api-dotnet/JsonApiDotNetCore</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ben.Demystifier" Version="0.1.1" />
-    <PackageReference Include="Humanizer" Version="2.4.2" />
-    <PackageReference Include="Microsoft.AspNetCore.Routing" Version="$(AspNetCoreVersion)" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="$(AspNetCoreVersion)" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(EFCoreVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftLoggingVersion)" />
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="System.Memory" Version="4.5.0" />
-    <PackageReference Include="System.ValueTuple" Version="$(TuplesVersion)" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta-62925-02" PrivateAssets="All" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
-  <!-- 
-    To generate DocFX documentation on Windows platforms: dotnet build -c Release /p:DocFx=true
-  -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <IsWindows Condition="'$(OS)' == 'Windows_NT'">true</IsWindows>
-    <GenerateDocumentation Condition="'$(IsWindows)|$(DocFx)' == 'true|true'">true</GenerateDocumentation>
-    <DocumentationFile>bin\Release\netstandard2.0\JsonApiDotNetCore.xml</DocumentationFile>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(GenerateDocumentation)' == 'true'">
-    <PackageReference Include="docfx.console" Version="2.33.0" />
+  <ItemGroup>
+    <PackageReference Include="Ben.Demystifier" Version="0.1.6" />
+    <PackageReference Include="Humanizer" Version="2.8.26" />
+    <PackageReference Include="JetBrains.Annotations" Version="2020.3.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="3.1.0" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="SauceControl.InheritDoc" Version="1.2.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>
-
 </Project>
