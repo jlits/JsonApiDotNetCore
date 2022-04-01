@@ -1,25 +1,38 @@
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Attributes.Exporters;
+
 using JsonApiDotNetCore.Internal;
 
-namespace Benchmarks.RequestMiddleware
+namespace Benchmarks.RequestMiddleware;
+
+[MarkdownExporter]
+[MemoryDiagnoser]
+public class ContainsMediaTypeParameters_Benchmarks
 {
-    [MarkdownExporter, MemoryDiagnoser]
-    public class ContainsMediaTypeParameters_Benchmarks
+    #region Static Fields and Constants
+
+    private const string MEDIA_TYPE = "application/vnd.api+json; version=1";
+
+    #endregion
+
+    #region Methods
+
+    [Benchmark]
+    public void UsingSplit()
     {
-        private const string MEDIA_TYPE = "application/vnd.api+json; version=1";
-
-        [Benchmark]
-        public void UsingSplit() => UsingSplitImpl(MEDIA_TYPE);
-
-        [Benchmark]
-        public void Current() 
-            => JsonApiDotNetCore.Middleware.RequestMiddleware.ContainsMediaTypeParameters(MEDIA_TYPE);
-
-        private bool UsingSplitImpl(string mediaType)
-        {
-            var mediaTypeArr = mediaType.Split(';');
-            return (mediaTypeArr[0] ==  Constants.ContentType && mediaTypeArr.Length == 2);	
-        }
+        UsingSplitImpl(MEDIA_TYPE);
     }
+
+    [Benchmark]
+    public void Current()
+    {
+        JsonApiDotNetCore.Middleware.RequestMiddleware.ContainsMediaTypeParameters(MEDIA_TYPE);
+    }
+
+    private bool UsingSplitImpl(string mediaType)
+    {
+        var mediaTypeArr = mediaType.Split(';');
+        return mediaTypeArr[0] == Constants.ContentType && mediaTypeArr.Length == 2;
+    }
+
+    #endregion
 }

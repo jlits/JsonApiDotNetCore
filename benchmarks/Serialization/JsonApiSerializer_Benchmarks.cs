@@ -1,49 +1,81 @@
 using System.Collections.Generic;
+
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Attributes.Exporters;
+
 using JsonApiDotNetCore.Builders;
 using JsonApiDotNetCore.Configuration;
 using JsonApiDotNetCore.Internal.Generics;
 using JsonApiDotNetCore.Models;
 using JsonApiDotNetCore.Serialization;
 using JsonApiDotNetCore.Services;
+
 using Moq;
+
 using Newtonsoft.Json.Serialization;
 
-namespace Benchmarks.Serialization {
-    [MarkdownExporter]
-    public class JsonApiSerializer_Benchmarks {
-        private const string TYPE_NAME = "simple-types";
-        private static readonly SimpleType Content = new SimpleType();
+namespace Benchmarks.Serialization;
 
-        private readonly JsonApiSerializer _jsonApiSerializer;
+[MarkdownExporter]
+public class JsonApiSerializer_Benchmarks
+{
+    #region Static Fields and Constants
 
-        public JsonApiSerializer_Benchmarks() {
-            var resourceGraphBuilder = new ResourceGraphBuilder();
-            resourceGraphBuilder.AddResource<SimpleType>(TYPE_NAME);
-            var resourceGraph = resourceGraphBuilder.Build();
+    private const string TYPE_NAME = "simple-types";
+    private static readonly SimpleType Content = new();
 
-            var jsonApiContextMock = new Mock<IJsonApiContext>();
-            jsonApiContextMock.SetupAllProperties();
-            jsonApiContextMock.Setup(m => m.ResourceGraph).Returns(resourceGraph);
-            jsonApiContextMock.Setup(m => m.AttributesToUpdate).Returns(new Dictionary<AttrAttribute, object>());
+    #endregion
 
-            var jsonApiOptions = new JsonApiOptions();
-            jsonApiOptions.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
-            jsonApiContextMock.Setup(m => m.Options).Returns(jsonApiOptions);
+    #region Constructors
 
-            var genericProcessorFactoryMock = new Mock<IGenericProcessorFactory>();
+    public JsonApiSerializer_Benchmarks()
+    {
+        var resourceGraphBuilder = new ResourceGraphBuilder();
+        resourceGraphBuilder.AddResource<SimpleType>(TYPE_NAME);
+        var resourceGraph = resourceGraphBuilder.Build();
 
-            var documentBuilder = new DocumentBuilder(jsonApiContextMock.Object);
-            _jsonApiSerializer = new JsonApiSerializer(jsonApiContextMock.Object, documentBuilder);
-        }
+        var jsonApiContextMock = new Mock<IJsonApiContext>();
+        jsonApiContextMock.SetupAllProperties();
+        jsonApiContextMock.Setup(m => m.ResourceGraph).Returns(resourceGraph);
+        jsonApiContextMock.Setup(m => m.AttributesToUpdate).Returns(new Dictionary<AttrAttribute, object>());
 
-        [Benchmark]
-        public object SerializeSimpleObject() => _jsonApiSerializer.Serialize(Content);
+        var jsonApiOptions = new JsonApiOptions();
+        jsonApiOptions.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+        jsonApiContextMock.Setup(m => m.Options).Returns(jsonApiOptions);
 
-        private class SimpleType : Identifiable {
-            [Attr("name")]
-            public string Name { get; set; }
-        }
+        var genericProcessorFactoryMock = new Mock<IGenericProcessorFactory>();
+
+        var documentBuilder = new DocumentBuilder(jsonApiContextMock.Object);
+        _jsonApiSerializer = new JsonApiSerializer(jsonApiContextMock.Object, documentBuilder);
     }
+
+    #endregion
+
+    #region Fields
+
+    private readonly JsonApiSerializer _jsonApiSerializer;
+
+    #endregion
+
+    #region Methods
+
+    [Benchmark]
+    public object SerializeSimpleObject()
+    {
+        return _jsonApiSerializer.Serialize(Content);
+    }
+
+    #endregion
+
+    #region Nested type: SimpleType
+
+    private class SimpleType : Identifiable
+    {
+        #region Properties
+
+        [Attr("name")] public string Name { get; set; }
+
+        #endregion
+    }
+
+    #endregion
 }

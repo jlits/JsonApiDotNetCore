@@ -1,64 +1,84 @@
+using System;
+
+using JsonApiDotNetCore.Extensions;
+
+using JsonApiDotNetCoreExample.Data;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using JsonApiDotNetCoreExample.Data;
-using Microsoft.EntityFrameworkCore;
-using JsonApiDotNetCore.Extensions;
-using System;
 
-namespace JsonApiDotNetCoreExample
+namespace JsonApiDotNetCoreExample;
+
+public class Startup
 {
-    public class Startup
+    #region Constructors
+
+    public Startup(IHostingEnvironment env)
     {
-        public readonly IConfiguration Config;
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(env.ContentRootPath)
+            .AddJsonFile("appsettings.json", true, false)
+            .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true)
+            .AddEnvironmentVariables();
 
-        public Startup(IHostingEnvironment env)
-        {
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
-                .AddEnvironmentVariables();
+        Config = builder.Build();
+    }
 
-            Config = builder.Build();
-        }
+    #endregion
 
-        public virtual IServiceProvider ConfigureServices(IServiceCollection services)
-        {
-            var loggerFactory = new LoggerFactory();
-            loggerFactory.AddConsole(LogLevel.Warning);
+    #region Fields
 
-            var mvcBuilder = services.AddMvcCore();
+    public readonly IConfiguration Config;
 
-            services
-                .AddSingleton<ILoggerFactory>(loggerFactory)
-                .AddDbContext<AppDbContext>(options => options.UseNpgsql(GetDbConnectionString()), ServiceLifetime.Transient)
-                .AddJsonApi(options => {
+    #endregion
+
+    #region Methods
+
+    public virtual IServiceProvider ConfigureServices(IServiceCollection services)
+    {
+        var loggerFactory = new LoggerFactory();
+
+        //loggerFactory.AddConsole(LogLevel.Warning);
+
+        var mvcBuilder = services.AddMvcCore();
+
+        services
+            .AddSingleton<ILoggerFactory>(loggerFactory)
+            .AddDbContext<AppDbContext>(options => options.UseNpgsql(GetDbConnectionString()),
+                ServiceLifetime.Transient)
+            .AddJsonApi(options =>
+                {
                     options.Namespace = "api/v1";
                     options.DefaultPageSize = 5;
                     options.IncludeTotalRecordCount = true;
-                }, 
+                },
                 mvcBuilder,
                 discovery => discovery.AddCurrentAssembly());
 
-            return services.BuildServiceProvider();
-        }
-
-        public virtual void Configure(
-            IApplicationBuilder app,
-            IHostingEnvironment env,
-            ILoggerFactory loggerFactory,
-            AppDbContext context)
-        {
-            context.Database.EnsureCreated();
-
-            loggerFactory.AddConsole(Config.GetSection("Logging"));
-
-            app.UseJsonApi();
-        }
-
-        public string GetDbConnectionString() => Config["Data:DefaultConnection"];
+        return services.BuildServiceProvider();
     }
+
+    public virtual void Configure(
+        IApplicationBuilder app,
+        IHostingEnvironment env,
+        ILoggerFactory loggerFactory,
+        AppDbContext context)
+    {
+        context.Database.EnsureCreated();
+
+        //loggerFactory.AddConsole(Config.GetSection("Logging"));
+
+        app.UseJsonApi();
+    }
+
+    public string GetDbConnectionString()
+    {
+        return Config["Data:DefaultConnection"];
+    }
+
+    #endregion
 }

@@ -1,38 +1,53 @@
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Attributes.Exporters;
-using BenchmarkDotNet.Attributes.Jobs;
 
-namespace Benchmarks.LinkBuilder
+namespace Benchmarks.LinkBuilder;
+
+[MarkdownExporter]
+[SimpleJob(3, 10, 20)]
+[MemoryDiagnoser]
+public class LinkBuilder_GetNamespaceFromPath_Benchmarks
 {
-    [MarkdownExporter, SimpleJob(launchCount : 3, warmupCount : 10, targetCount : 20), MemoryDiagnoser]
-    public class LinkBuilder_GetNamespaceFromPath_Benchmarks
+    #region Static Fields and Constants
+
+    private const string PATH = "/api/some-really-long-namespace-path/resources/current/articles";
+    private const string ENTITY_NAME = "articles";
+
+    #endregion
+
+    #region Methods
+
+    [Benchmark]
+    public void UsingSplit()
     {
-        private const string PATH = "/api/some-really-long-namespace-path/resources/current/articles";
-        private const string ENTITY_NAME = "articles";
+        GetNamespaceFromPath_BySplitting(PATH, ENTITY_NAME);
+    }
 
-        [Benchmark]
-        public void UsingSplit() => GetNamespaceFromPath_BySplitting(PATH, ENTITY_NAME);
+    [Benchmark]
+    public void Current()
+    {
+        GetNameSpaceFromPath_Current(PATH, ENTITY_NAME);
+    }
 
-        [Benchmark]
-        public void Current() => GetNameSpaceFromPath_Current(PATH, ENTITY_NAME);
+    public static string GetNamespaceFromPath_BySplitting(string path, string entityName)
+    {
+        var nSpace = string.Empty;
+        var segments = path.Split('/');
 
-        public static string GetNamespaceFromPath_BySplitting(string path, string entityName)
+        for (var i = 1; i < segments.Length; i++)
         {
-            var nSpace = string.Empty;
-            var segments = path.Split('/');
+            if (segments[i].ToLower() == entityName)
+                break;
 
-            for (var i = 1; i < segments.Length; i++)
-            {
-                if (segments[i].ToLower() == entityName)
-                    break;
-
-                nSpace += $"/{segments[i]}";
-            }
-
-            return nSpace;
+            nSpace += $"/{segments[i]}";
         }
 
-        public static string GetNameSpaceFromPath_Current(string path, string entityName)
-            => JsonApiDotNetCore.Builders.LinkBuilder.GetNamespaceFromPath(path, entityName);
+        return nSpace;
     }
+
+    public static string GetNameSpaceFromPath_Current(string path, string entityName)
+    {
+        return JsonApiDotNetCore.Builders.LinkBuilder.GetNamespaceFromPath(path, entityName);
+    }
+
+    #endregion
 }
